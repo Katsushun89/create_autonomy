@@ -27,7 +27,7 @@ include_directories(
   ${geometry_msgs_INCLUDE_DIRS}
   ${libcreate_INCLUDE_DIRS}
   ${nav_msgs_INCLUDE_DIRS}
-  ${roscpp_INCLUDE_DIRS}
+  ${rclcpp_INCLUDE_DIRS}
   ${sensor_msgs_INCLUDE_DIRS}
   ${std_msgs_INCLUDE_DIRS}
   ${tf2_INCLUDE_DIRS}
@@ -47,7 +47,7 @@ ament_target_dependencies(${PROJECT_NAME}
  "std_msgs"
  "tf2"
  "tf2_ros"
- )
+)
 
 #Test 
 if(BUILD_TESTING)
@@ -62,7 +62,7 @@ install(TARGETS ${PROJECT_NAME}
 
 #include directory
 install(DIRECTORY include/${PROJECT_NAME}
-  DESTINATION include/4{PROJECT_NAME}
+  DESTINATION include/${PROJECT_NAME}
   FILES_MATCHING PATTERN "*.hpp"
 )
 

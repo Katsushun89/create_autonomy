@@ -14,8 +14,6 @@
 
   <buildtool_depend>ament_cmake</buildtool_depend>
 
-  <build_depend>roslint</build_depend>
-
   <depend>ca_msgs</depend>
   <depend>diagnostic_msgs</depend>
   <!--ROS2 now not support diagnostic_updater -->
@@ -23,10 +21,12 @@
   <depend>geometry_msgs</depend>
   <depend>libcreate</depend>
   <depend>nav_msgs</depend>
-  <depend>roscpp</depend>
+  <depend>rclcpp</depend>
+  <depend>rclcpp_lifecycle</depend>
   <depend>sensor_msgs</depend>
   <depend>std_msgs</depend>
-  <depend>tf</depend>
+  <depend>tf2</depend>
+  <depend>tf2_ros</depend>
 
   <exec_depend>ca_description</exec_depend>
   
