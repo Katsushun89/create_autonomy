@@ -403,14 +403,14 @@ bool CreateDriver::update()
   publishWheeldrop();
 
   // If last velocity command was sent longer than latch duration, stop robot
-  if (ros::Time::now() - last_cmd_vel_time_ >= ros::Duration(latch_duration_))
-  {
+  if (ros_clock_.now() - last_cmd_vel_time_ >= rclcpp::Duration(latch_duration_)) {
     robot_->drive(0, 0);
   }
 
   return true;
 }
 
+#if 0 //unsupport diagnostic_updater until now
 void CreateDriver::updateBatteryDiagnostics(diagnostic_updater::DiagnosticStatusWrapper& stat)
 {
   const float charge = robot_->getBatteryCharge();
@@ -543,6 +543,7 @@ void CreateDriver::updateDriverDiagnostics(diagnostic_updater::DiagnosticStatusW
     stat.summary(diagnostic_msgs::DiagnosticStatus::OK, "Maintaining loop frequency");
   }
 }
+#endif
 
 void CreateDriver::publishOdom()
 {
@@ -550,11 +551,15 @@ void CreateDriver::publishOdom()
   create::Vel vel = robot_->getVel();
 
   // Populate position info
-  geometry_msgs::Quaternion quat = tf::createQuaternionMsgFromRollPitchYaw(0, 0, pose.yaw);
-  odom_msg_.header.stamp = ros::Time::now();
+  tf2::Quaternion quat;
+  quat.setRPY(0, 0, pose.yaw);
+  odom_msg_.header.stamp = ros_clock_.now();
   odom_msg_.pose.pose.position.x = pose.x;
   odom_msg_.pose.pose.position.y = pose.y;
-  odom_msg_.pose.pose.orientation = quat;
+  odom_msg_.pose.pose.orientation.x = quat.x();
+  odom_msg_.pose.pose.orientation.y = quat.y();
+  odom_msg_.pose.pose.orientation.z = quat.z();
+  odom_msg_.pose.pose.orientation.w = quat.w();
 
   // Populate velocity info
   odom_msg_.twist.twist.linear.x = vel.x;
@@ -581,101 +586,96 @@ void CreateDriver::publishOdom()
   odom_msg_.twist.covariance[31] = vel.covariance[7];
   odom_msg_.twist.covariance[35] = vel.covariance[8];
 
-  if (publish_tf_)
-  {
-    tf_odom_.header.stamp = ros::Time::now();
+  if (publish_tf_) {
+    tf_odom_.header.stamp = ros_clock_.now();
     tf_odom_.transform.translation.x = pose.x;
     tf_odom_.transform.translation.y = pose.y;
-    tf_odom_.transform.rotation = quat;
-    tf_broadcaster_.sendTransform(tf_odom_);
+    tf_odom_.transform.rotation.x = quat.x();
+    tf_odom_.transform.rotation.y = quat.y();
+    tf_odom_.transform.rotation.z = quat.z();
+    tf_odom_.transform.rotation.w = quat.w();
+    tf_broadcaster_->sendTransform(tf_odom_);
   }
 
-  odom_pub_.publish(odom_msg_);
+  odom_pub_->publish(odom_msg_);
 }
 
 void CreateDriver::publishJointState()
 {
   // Publish joint states
-  float wheelRadius = model_.getWheelDiameter() / 2.0;
+  doubl wheelRadius = model_.getWheelDiameter() / 2.0;
 
-  joint_state_msg_.header.stamp = ros::Time::now();
+  joint_state_msg_.header.stamp = ros_clock_.now();
   joint_state_msg_.position[0] = robot_->getLeftWheelDistance() / wheelRadius;
   joint_state_msg_.position[1] = robot_->getRightWheelDistance() / wheelRadius;
   joint_state_msg_.velocity[0] = robot_->getRequestedLeftWheelVel() / wheelRadius;
   joint_state_msg_.velocity[1] = robot_->getRequestedRightWheelVel() / wheelRadius;
-  wheel_joint_pub_.publish(joint_state_msg_);
+  wheel_joint_pub_->publish(joint_state_msg_);
 }
 
 void CreateDriver::publishBatteryInfo()
 {
   float32_msg_.data = robot_->getVoltage();
-  voltage_pub_.publish(float32_msg_);
+  voltage_pub_->publish(float32_msg_);
   float32_msg_.data = robot_->getCurrent();
-  current_pub_.publish(float32_msg_);
+  current_pub_->publish(float32_msg_);
   float32_msg_.data = robot_->getBatteryCharge();
-  charge_pub_.publish(float32_msg_);
+  charge_pub_->publish(float32_msg_);
   float32_msg_.data = robot_->getBatteryCapacity();
-  capacity_pub_.publish(float32_msg_);
+  capacity_pub_->publish(float32_msg_);
   int16_msg_.data = robot_->getTemperature();
-  temperature_pub_.publish(int16_msg_);
+  temperature_pub_->publish(int16_msg_);
   float32_msg_.data = robot_->getBatteryCharge() / robot_->getBatteryCapacity();
-  charge_ratio_pub_.publish(float32_msg_);
+  charge_ratio_pub_->publish(float32_msg_);
 
   const create::ChargingState charging_state = robot_->getChargingState();
-  charging_state_msg_.header.stamp = ros::Time::now();
-  switch (charging_state)
-  {
+  charging_state_msg_.header.stamp = ros_clock_.now();
+  switch (charging_state) {
     case create::CHARGE_NONE:
-      charging_state_msg_.state = charging_state_msg_.CHARGE_NONE;
+      charging_state_msg_.state = ca_msgs::msg::ChargingState.CHARGE_NONE;
       break;
     case create::CHARGE_RECONDITION:
-      charging_state_msg_.state = charging_state_msg_.CHARGE_RECONDITION;
+      charging_state_msg_.state = ca_msgs::msg::ChargingState::CHARGE_RECONDITION;
       break;
 
     case create::CHARGE_FULL:
-      charging_state_msg_.state = charging_state_msg_.CHARGE_FULL;
+      charging_state_msg_.state = ca_msgs::msg::ChargingState::CHARGE_FULL;
       break;
 
     case create::CHARGE_TRICKLE:
-      charging_state_msg_.state = charging_state_msg_.CHARGE_TRICKLE;
+      charging_state_msg_.state = ca_msgs::msg::ChargingState::CHARGE_TRICKLE;
       break;
 
     case create::CHARGE_WAITING:
-      charging_state_msg_.state = charging_state_msg_.CHARGE_WAITING;
+      charging_state_msg_.state = ca_msgs::msg::ChargingState::CHARGE_WAITING;
       break;
 
     case create::CHARGE_FAULT:
-      charging_state_msg_.state = charging_state_msg_.CHARGE_FAULT;
+      charging_state_msg_.state = ca_msgs::msg::ChargingState::CHARGE_FAULT;
       break;
   }
-  charging_state_pub_.publish(charging_state_msg_);
+  charging_state_pub_->publish(charging_state_msg_);
 }
 
 void CreateDriver::publishButtonPresses() const
 {
-  if (robot_->isCleanButtonPressed())
-  {
-    clean_btn_pub_.publish(empty_msg_);
+  if (robot_->isCleanButtonPressed()) {
+    clean_btn_pub_->publish(empty_msg_);
   }
-  if (robot_->isDayButtonPressed())
-  {
-    day_btn_pub_.publish(empty_msg_);
+  if (robot_->isDayButtonPressed()) {
+    day_btn_pub_->publish(empty_msg_);
   }
-  if (robot_->isHourButtonPressed())
-  {
-    hour_btn_pub_.publish(empty_msg_);
+  if (robot_->isHourButtonPressed()) {
+    hour_btn_pub_->publish(empty_msg_);
   }
-  if (robot_->isMinButtonPressed())
-  {
-    min_btn_pub_.publish(empty_msg_);
+  if (robot_->isMinButtonPressed()) {
+    min_btn_pub_->publish(empty_msg_);
   }
-  if (robot_->isDockButtonPressed())
-  {
-    dock_btn_pub_.publish(empty_msg_);
+  if (robot_->isDockButtonPressed()) {
+    dock_btn_pub_->publish(empty_msg_);
   }
-  if (robot_->isSpotButtonPressed())
-  {
-    spot_btn_pub_.publish(empty_msg_);
+  if (robot_->isSpotButtonPressed()) {
+    spot_btn_pub_->publish(empty_msg_);
   }
 }
 
@@ -683,18 +683,17 @@ void CreateDriver::publishOmniChar()
 {
   uint8_t ir_char = robot_->getIROmni();
   uint16_msg_.data = ir_char;
-  omni_char_pub_.publish(uint16_msg_);
+  omni_char_pub_->publish(uint16_msg_);
   // TODO(jacobperron): Publish info based on character, such as dock in sight
 }
 
 void CreateDriver::publishMode()
 {
   const create::CreateMode mode = robot_->getMode();
-  mode_msg_.header.stamp = ros::Time::now();
-  switch (mode)
-  {
+  mode_msg_.header.stamp = ros_clock_.now();
+  switch (mode) {
     case create::MODE_OFF:
-      mode_msg_.mode = mode_msg_.MODE_OFF;
+      mode_msg_.mode = ca_msgs::msg::Mode::MODE_OFF;
       break;
     case create::MODE_PASSIVE:
       mode_msg_.mode = mode_msg_.MODE_PASSIVE;
@@ -709,17 +708,16 @@ void CreateDriver::publishMode()
       RCLCPP_ERROR(get_logger(), "[CREATE] Unknown mode detected");
       break;
   }
-  mode_pub_.publish(mode_msg_);
+  mode_pub_->publish(mode_msg_);
 }
 
 void CreateDriver::publishBumperInfo()
 {
-  bumper_msg_.header.stamp = ros::Time::now();
+  bumper_msg_.header.stamp = ros_clock_.now();
   bumper_msg_.is_left_pressed = robot_->isLeftBumper();
   bumper_msg_.is_right_pressed = robot_->isRightBumper();
 
-  if (model_.getVersion() >= create::V_3)
-  {
+  if (model_.getVersion() >= create::V_3) {
     bumper_msg_.is_light_left = robot_->isLightBumperLeft();
     bumper_msg_.is_light_front_left = robot_->isLightBumperFrontLeft();
     bumper_msg_.is_light_center_left = robot_->isLightBumperCenterLeft();
@@ -735,52 +733,25 @@ void CreateDriver::publishBumperInfo()
     bumper_msg_.light_signal_center_right = robot_->getLightSignalCenterRight();
   }
 
-  bumper_pub_.publish(bumper_msg_);
+  bumper_pub_->publish(bumper_msg_);
 }
 
 void CreateDriver::publishWheeldrop()
 {
   if (robot_->isWheeldrop())
-    wheeldrop_pub_.publish(empty_msg_);
-}
-
-void CreateDriver::spinOnce()
-{
-  update();
-  diagnostics_.update();
-  ros::spinOnce();
-}
-
-void CreateDriver::spin()
-{
-  ros::Rate rate(loop_hz_);
-  while (ros::ok())
-  {
-    spinOnce();
-
-    is_running_slowly_ = !rate.sleep();
-    if (is_running_slowly_)
-    {
-      ROS_WARN("[CREATE] Loop running slowly.");
-    }
-  }
+    wheeldrop_pub_->publish(empty_msg_);
 }
 
 int main(int argc, char** argv)
 {
-  ros::init(argc, argv, "ca_driver");
-  ros::NodeHandle nh;
+  setvbuf(stdout, NULL, _IONBF, BUFSIZ);
+  rclcpp::init(argc, argv);
 
-  CreateDriver create_driver(nh);
+  rclcpp::executors::SingleThreadedExecutor executor;
+  auto node = std::make_shared<create_autonomy::CreateDriver>("ca_driver");
+  executor.add_node(node->get_node_base_interface());
+  executor.spin();
+  rclcpp::shutdown();
 
-  try
-  {
-    create_driver.spin();
-  }
-  catch (std::runtime_error& ex)
-  {
-    ROS_FATAL_STREAM("[CREATE] Runtime error: " << ex.what());
-    return 1;
-  }
   return 0;
 }
