@@ -34,44 +34,65 @@ POSSIBILITY OF SUCH DAMAGE.
 
 #include "create_driver/create_driver.hpp"
 
-CreateDriver::CreateDriver(ros::NodeHandle& nh)
-  : nh_(nh),
-    priv_nh_("~"),
-    diagnostics_(),
-    model_(create::RobotModel::CREATE_2),
-    is_running_slowly_(false)
+CreateDriver::CreateDriver(const std::string & name)
+: LifecycleNode(name),
+  model_(create::RobotModel::CREATE_2),
+  ros_clock_(RCL_ROS_TIME),
+  dev_("/dev/ttyUSB0"),
+  base_frame_("base_footprint"),
+  odom_frame_("odom"),
+  latch_duration_(0.2),
+  loop_hz_(10.0),
+  publish_tf_(true)
 {
-  bool create_one;
-  std::string robot_model_name;
-  priv_nh_.param<std::string>("dev", dev_, "/dev/ttyUSB0");
-  priv_nh_.param<std::string>("robot_model", robot_model_name, "CREATE_2");
-  priv_nh_.param<std::string>("base_frame", base_frame_, "base_footprint");
-  priv_nh_.param<std::string>("odom_frame", odom_frame_, "odom");
-  priv_nh_.param<double>("latch_cmd_duration", latch_duration_, 0.2);
-  priv_nh_.param<double>("loop_hz", loop_hz_, 10.0);
-  priv_nh_.param<bool>("publish_tf", publish_tf_, true);
+  std::string robot_model_name = "CREATE_2";
 
-  if (robot_model_name == "ROOMBA_400")
-  {
+  rclcpp::Parameter parameter;
+
+  if(get_parameter("dev", parameter)){
+    dev_ = parameter.get_value<std::string>();
+  }
+  if(get_parameter("robot_model", parameter)){
+    robot_model_name = parameter.get_value<std::string>();
+  }
+  if(get_parameter("base_frame", parameter)){
+    base_frame_ = parameter.get_value<std::string>();
+  }
+  if(get_parameter("odom_frame", parameter)){
+    odom_frame_ = parameter.get_value<std::string>();
+  }
+  if(get_parameter("latch_cmd_duration", parameter)){
+    latch_duration_ = parameter.get_value<double>();
+  }
+  if(get_parameter("loop_hz", parameter)){
+    loop_hz_ = parameter.get_value<double>();
+  }
+  if(get_parameter("publish_tf", parameter)){
+    publish_tf_ = parameter.get_value<bool>();
+  }
+
+  if (robot_model_name == "ROOMBA_400") {
     model_ = create::RobotModel::ROOMBA_400;
-  }
-  else if (robot_model_name == "CREATE_1")
-  {
+  } else if (robot_model_name == "CREATE_1") {
     model_ = create::RobotModel::CREATE_1;
-  }
-  else if (robot_model_name == "CREATE_2")
-  {
+  } else if (robot_model_name == "CREATE_2") {
     model_ = create::RobotModel::CREATE_2;
-  }
-  else
-  {
-    ROS_FATAL_STREAM("[CREATE] Robot model \"" + robot_model_name + "\" is not known.");
-    ros::shutdown();
+  } else {
+    RCLCPP_FATAL(get_logger(), "[CREATE] Robot model \"%s\" is not known.",
+      robot_model_name.c_str());
+    rclcpp::shutdown();
     return;
   }
 
-  ROS_INFO_STREAM("[CREATE] \"" << robot_model_name << "\" selected");
+  RCLCPP_STREAM(get_logger(), "[CREATE] \"%s\" selected", robot_model_name.c_str());
 
+  baud_ = model_.getBaud();
+  if (get_parameter("baud", parameter)) {
+    baud_ = parameter.get_value<int>();
+  }
+}
+
+#if 0
   priv_nh_.param<int>("baud", baud_, model_.getBaud());
 
   robot_ = new create::Create(model_);
@@ -157,90 +178,72 @@ CreateDriver::CreateDriver(ros::NodeHandle& nh)
 
   ROS_INFO("[CREATE] Ready.");
 }
+#endif
 
 CreateDriver::~CreateDriver()
 {
-  ROS_INFO("[CREATE] Destruct sequence initiated.");
-  robot_->disconnect();
-  delete robot_;
 }
 
-void CreateDriver::cmdVelCallback(const geometry_msgs::TwistConstPtr& msg)
+void CreateDriver::cmdVelCallback(const geometry_msgs::msg::Twist::SharedPtr msg)
 {
   robot_->drive(msg->linear.x, msg->angular.z);
-  last_cmd_vel_time_ = ros::Time::now();
+  last_cmd_vel_time_ = ros_clock_::now();
 }
 
-void CreateDriver::debrisLEDCallback(const std_msgs::BoolConstPtr& msg)
+void CreateDriver::debrisLEDCallback(const std_msgs::msg::Bool::SharedPtr msg)
 {
   robot_->enableDebrisLED(msg->data);
 }
 
-void CreateDriver::spotLEDCallback(const std_msgs::BoolConstPtr& msg)
+void CreateDriver::spotLEDCallback(const std_msgs::msg::Bool::SharedPtr msg)
 {
   robot_->enableSpotLED(msg->data);
 }
 
-void CreateDriver::dockLEDCallback(const std_msgs::BoolConstPtr& msg)
+void CreateDriver::dockLEDCallback(const std_msgs::msg::Bool::SharedPtr msg)
 {
   robot_->enableDockLED(msg->data);
 }
 
-void CreateDriver::checkLEDCallback(const std_msgs::BoolConstPtr& msg)
+void CreateDriver::checkLEDCallback(const std_msgs::msg::Bool::SharedPtr msg)
 {
   robot_->enableCheckRobotLED(msg->data);
 }
 
-void CreateDriver::powerLEDCallback(const std_msgs::UInt8MultiArrayConstPtr& msg)
+void CreateDriver::powerLEDCallback(const std_msgs::msg::UInt8MultiArray::SharedPtr msg)
 {
-  if (msg->data.size() < 1)
-  {
-    ROS_ERROR("[CREATE] No values provided to set power LED");
-  }
-  else
-  {
-    if (msg->data.size() < 2)
-    {
+  if (msg->data.empty()) {
+    RCLCPP_ERROR(get_logger(), "[CREATE] No values provided to set power LED");
+  } else {
+    if (msg->data.size() < 2) {
       robot_->setPowerLED(msg->data[0]);
-    }
-    else
-    {
+    } else {
       robot_->setPowerLED(msg->data[0], msg->data[1]);
     }
   }
 }
 
-void CreateDriver::setASCIICallback(const std_msgs::UInt8MultiArrayConstPtr& msg)
+void CreateDriver::setASCIICallback(const std_msgs::msg::UInt8MultiArray::SharedPtr msg)
 {
-  bool result;
-  if (msg->data.size() < 1)
-  {
-    ROS_ERROR("[CREATE] No ASCII digits provided");
-  }
-  else if (msg->data.size() < 2)
-  {
+  bool result = false;
+  if (msg->data.empty()) {
+    RCLCPP_ERROR(get_logger(), "[CREATE] No ASCII digits provided");
+  } else if (msg->data.size() < 2) {
     result = robot_->setDigitsASCII(msg->data[0], ' ', ' ', ' ');
-  }
-  else if (msg->data.size() < 3)
-  {
+  } else if (msg->data.size() < 3) {
     result = robot_->setDigitsASCII(msg->data[0], msg->data[1], ' ', ' ');
-  }
-  else if (msg->data.size() < 4)
-  {
+  } else if (msg->data.size() < 4) {
     result = robot_->setDigitsASCII(msg->data[0], msg->data[1], msg->data[2], ' ');
-  }
-  else
-  {
+  } else {
     result = robot_->setDigitsASCII(msg->data[0], msg->data[1], msg->data[2], msg->data[3]);
   }
 
-  if (!result)
-  {
-    ROS_ERROR("[CREATE] ASCII character out of range [32, 126]");
+  if (!result) {
+    RCLCPP_ERROR(get_logger(), "[CREATE] ASCII character out of range [32, 126]");
   }
 }
 
-void CreateDriver::dockCallback(const std_msgs::EmptyConstPtr& msg)
+void CreateDriver::dockCallback(const std_msgs::msg::Empty::SharedPtr msg)
 {
   robot_->setMode(create::MODE_PASSIVE);
 
@@ -251,25 +254,25 @@ void CreateDriver::dockCallback(const std_msgs::EmptyConstPtr& msg)
   robot_->dock();
 }
 
-void CreateDriver::undockCallback(const std_msgs::EmptyConstPtr& msg)
+void CreateDriver::undockCallback(const std_msgs::msg::Empty::SharedPtr msg)
 {
   // Switch robot back to FULL mode
   robot_->setMode(create::MODE_FULL);
 }
 
-void CreateDriver::defineSongCallback(const ca_msgs::DefineSongConstPtr& msg)
+void CreateDriver::defineSongCallback(const ca_msgs::msg::DefineSong::SharedPtr msg)
 {
   if (!robot_->defineSong(msg->song, msg->length, &(msg->notes.front()), &(msg->durations.front())))
   {
-    ROS_ERROR_STREAM("[CREATE] Failed to define song " << msg->song << " of length " << msg->length);
+    RCLCPP_ERROR(get_logger(), "[CREATE] Failed to define song " << msg->song << " of length " << msg->length);
   }
 }
 
-void CreateDriver::playSongCallback(const ca_msgs::PlaySongConstPtr& msg)
+void CreateDriver::playSongCallback(const ca_msgs::PlaySong::SharedPtr msg)
 {
   if (!robot_->playSong(msg->song))
   {
-    ROS_ERROR_STREAM("[CREATE] Failed to play song " << msg->song);
+    RCLCPP_ERROR(get_logger(), "[CREATE] Failed to play song " << msg->song);
   }
 }
 
@@ -588,7 +591,7 @@ void CreateDriver::publishMode()
       mode_msg_.mode = mode_msg_.MODE_FULL;
       break;
     default:
-      ROS_ERROR("[CREATE] Unknown mode detected");
+      RCLCPP_ERROR(get_logger(), "[CREATE] Unknown mode detected");
       break;
   }
   mode_pub_.publish(mode_msg_);

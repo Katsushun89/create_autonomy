@@ -46,6 +46,9 @@ POSSIBILITY OF SUCH DAMAGE.
 #include <std_msgs/msg/u_int8_multi_array.hpp>
 #include <tf2_ros/transform_broadcaster.h>
 
+#include <limits>
+#include <string>
+#include <memory>
 
 #include "ca_msgs/msg/charging_state.hpp"
 #include "ca_msgs/msg/mode.hpp"
@@ -55,8 +58,8 @@ POSSIBILITY OF SUCH DAMAGE.
 
 #include "create/create.h"
 
-#include <limits>
-#include <string>
+namespace create_autonomy
+{
 
 static const double MAX_DBL = std::numeric_limits<double>::max();
 static const double COVARIANCE[36] = {1e-5, 1e-5, 0.0,     0.0,     0.0,     1e-5,  // NOLINT(whitespace/braces)
@@ -69,22 +72,24 @@ static const double COVARIANCE[36] = {1e-5, 1e-5, 0.0,     0.0,     0.0,     1e-
 class CreateDriver
 {
 private:
-  create::Create* robot_;
+  std::unique_ptr<create::Create> robot_;
   create::RobotModel model_;
-  tf::TransformBroadcaster tf_broadcaster_;
-  diagnostic_updater::Updater diagnostics_;
-  ca_msgs::Mode mode_msg_;
-  ca_msgs::ChargingState charging_state_msg_;
-  ca_msgs::Bumper bumper_msg_;
-  nav_msgs::Odometry odom_msg_;
-  geometry_msgs::TransformStamped tf_odom_;
-  ros::Time last_cmd_vel_time_;
-  std_msgs::Empty empty_msg_;
-  std_msgs::Float32 float32_msg_;
-  std_msgs::UInt16 uint16_msg_;
-  std_msgs::Int16 int16_msg_;
-  sensor_msgs::JointState joint_state_msg_;
-  bool is_running_slowly_;
+  rclcpp::TimerBase::SharedPtr timer_;
+  std::shared_ptr<tf2_ros::TransformBroadcaster> tf_broadcaster_;
+  //diagnostic_updater::Updater diagnostics_;
+  ca_msgs::msg::Mode mode_msg_;
+  ca_msgs::msg::ChargingState charging_state_msg_;
+  ca_msgs::msg::Bumper bumper_msg_;
+  nav_msgs::msg::Odometry odom_msg_;
+  geometry_msgs::msg::TransformStamped tf_odom_;
+  rclcpp::Clock ros_clock_;
+  rclcpp::Time last_cmd_vel_time_;
+  std_msgs::msg::Empty empty_msg_;
+  std_msgs::msg::Float32 float32_msg_;
+  std_msgs::msg::UInt16 uint16_msg_;
+  std_msgs::msg::Int16 int16_msg_;
+  sensor_msgs::msg::JointState joint_state_msg_;
+  //bool is_running_slowly_;
 
   // ROS params
   std::string dev_;
@@ -95,24 +100,25 @@ private:
   bool publish_tf_;
   int baud_;
 
-  void cmdVelCallback(const geometry_msgs::TwistConstPtr& msg);
-  void debrisLEDCallback(const std_msgs::BoolConstPtr& msg);
-  void spotLEDCallback(const std_msgs::BoolConstPtr& msg);
-  void dockLEDCallback(const std_msgs::BoolConstPtr& msg);
-  void checkLEDCallback(const std_msgs::BoolConstPtr& msg);
-  void powerLEDCallback(const std_msgs::UInt8MultiArrayConstPtr& msg);
-  void setASCIICallback(const std_msgs::UInt8MultiArrayConstPtr& msg);
-  void dockCallback(const std_msgs::EmptyConstPtr& msg);
-  void undockCallback(const std_msgs::EmptyConstPtr& msg);
-  void defineSongCallback(const ca_msgs::DefineSongConstPtr& msg);
-  void playSongCallback(const ca_msgs::PlaySongConstPtr& msg);
+  void cmdVelCallback(const geometry_msgs::msg::Twist::SharedPtr& msg);
+  void debrisLEDCallback(const std_msgs::msg::Bool::SharedPtr msg);
+  void spotLEDCallback(const std_msgs::msg::Bool::SharedPtr msg);
+  void dockLEDCallback(const std_msgs::msg::Bool::SharedPtr msg);
+  void checkLEDCallback(const std_msgs::msg::Bool::SharedPtr msg);
+  void powerLEDCallback(const std_msgs::msg::UInt8MultiArray::SharedPtr msg);
+  void setASCIICallback(const std_msgs::msg::UInt8MultiArray::SharedPtr msg);
+  void dockCallback(const std_msgs::msg::Empty::SharedPtr msg);
+  void undockCallback(const std_msgs::msg::Empty::SharedPtr msg);
+  void defineSongCallback(const ca_msgs::msg::DefineSong::SharedPtr msg);
+  void playSongCallback(const ca_msgs::msg::PlaySong::SharedPtr msg);
 
-  bool update();
   void updateBatteryDiagnostics(diagnostic_updater::DiagnosticStatusWrapper& stat);
   void updateSafetyDiagnostics(diagnostic_updater::DiagnosticStatusWrapper& stat);
   void updateSerialDiagnostics(diagnostic_updater::DiagnosticStatusWrapper& stat);
   void updateModeDiagnostics(diagnostic_updater::DiagnosticStatusWrapper& stat);
   void updateDriverDiagnostics(diagnostic_updater::DiagnosticStatusWrapper& stat);
+
+  bool update();
   void publishOdom();
   void publishJointState();
   void publishBatteryInfo();
@@ -123,45 +129,51 @@ private:
   void publishWheeldrop();
 
 protected:
-  ros::NodeHandle nh_;
-  ros::NodeHandle priv_nh_;
-  ros::Subscriber cmd_vel_sub_;
-  ros::Subscriber debris_led_sub_;
-  ros::Subscriber spot_led_sub_;
-  ros::Subscriber dock_led_sub_;
-  ros::Subscriber check_led_sub_;
-  ros::Subscriber power_led_sub_;
-  ros::Subscriber set_ascii_sub_;
-  ros::Subscriber dock_sub_;
-  ros::Subscriber undock_sub_;
-  ros::Subscriber define_song_sub_;
-  ros::Subscriber play_song_sub_;
+  rclcpp::Subscription<geometry_msgs::msg::Twist>::SharedPtr cmd_vel_sub_;
+  rclcpp::Subscription<std_msgs::msg::Bool>::SharedPtr debris_led_sub_;
+  rclcpp::Subscription<std_msgs::msg::Bool>::SharedPtr spot_led_sub_;
+  rclcpp::Subscription<std_msgs::msg::Bool>::SharedPtr dock_led_sub_;
+  rclcpp::Subscription<std_msgs::msg::Bool>::SharedPtr check_led_sub_;
+  rclcpp::Subscription<std_msgs::msg::UInt8MultiArray>::SharedPtr power_led_sub_;
+  rclcpp::Subscription<std_msgs::msg::UInt8MultiArray>::SharedPtr set_ascii_sub_;
+  rclcpp::Subscription<std_msgs::msg::Empty>::SharedPtr dock_sub_;
+  rclcpp::Subscription<std_msgs::msg::Empty>::SharedPtr undock_sub_;
+  rclcpp::Subscription<ca_msgs::msg::DefineSong>::SharedPtr define_song_sub_;
+  rclcpp::Subscription<ca_msgs::msg::PlaySong>::SharedPtr play_song_sub_;
 
-  ros::Publisher odom_pub_;
-  ros::Publisher clean_btn_pub_;
-  ros::Publisher day_btn_pub_;
-  ros::Publisher hour_btn_pub_;
-  ros::Publisher min_btn_pub_;
-  ros::Publisher dock_btn_pub_;
-  ros::Publisher spot_btn_pub_;
-  ros::Publisher voltage_pub_;
-  ros::Publisher current_pub_;
-  ros::Publisher charge_pub_;
-  ros::Publisher charge_ratio_pub_;
-  ros::Publisher capacity_pub_;
-  ros::Publisher temperature_pub_;
-  ros::Publisher charging_state_pub_;
-  ros::Publisher omni_char_pub_;
-  ros::Publisher mode_pub_;
-  ros::Publisher bumper_pub_;
-  ros::Publisher wheeldrop_pub_;
-  ros::Publisher wheel_joint_pub_;
+  rclcpp_lifecycle::LifecyclePublisher<nav_msgs::msg::Odometry>::SharedPtr odom_pub_;
+  rclcpp_lifecycle::LifecyclePublisher<std_msgs::msg::Empty>::SharedPtr clean_btn_pub_;
+  rclcpp_lifecycle::LifecyclePublisher<std_msgs::msg::Empty>::SharedPtr day_btn_pub_;
+  rclcpp_lifecycle::LifecyclePublisher<std_msgs::msg::Empty>::SharedPtr hour_btn_pub_;
+  rclcpp_lifecycle::LifecyclePublisher<std_msgs::msg::Empty>::SharedPtr min_btn_pub_;
+  rclcpp_lifecycle::LifecyclePublisher<std_msgs::msg::Empty>::SharedPtr dock_btn_pub_;
+  rclcpp_lifecycle::LifecyclePublisher<std_msgs::msg::Empty>::SharedPtr spot_btn_pub_;
+  rclcpp_lifecycle::LifecyclePublisher<std_msgs::msg::Float32>::SharedPtr voltage_pub_;
+  rclcpp_lifecycle::LifecyclePublisher<std_msgs::msg::Float32>::SharedPtr current_pub_;
+  rclcpp_lifecycle::LifecyclePublisher<std_msgs::msg::Float32>::SharedPtr charge_pub_;
+  rclcpp_lifecycle::LifecyclePublisher<std_msgs::msg::Float32>::SharedPtr charge_ratio_pub_;
+  rclcpp_lifecycle::LifecyclePublisher<std_msgs::msg::Float32>::SharedPtr capacity_pub_;
+  rclcpp_lifecycle::LifecyclePublisher<std_msgs::msg::Int16>::SharedPtr temperature_pub_;
+  rclcpp_lifecycle::LifecyclePublisher<ca_msgs::msg::ChargingState>::SharedPtr charging_state_pub_;
+  rclcpp_lifecycle::LifecyclePublisher<std_msgs::msg::UInt16>::SharedPtr omni_char_pub_;
+  rclcpp_lifecycle::LifecyclePublisher<ca_msgs::msg::Mode>::SharedPtr mode_pub_;
+  rclcpp_lifecycle::LifecyclePublisher<ca_msgs::msg::Bumper>::SharedPtr bumper_pub_;
+  rclcpp_lifecycle::LifecyclePublisher<std_msgs::msg::Empty>::SharedPtr wheeldrop_pub_;
+  rclcpp_lifecycle::LifecyclePublisher<sensor_msgs::msg::JointState>::SharedPtr wheel_joint_pub_;
 
 public:
-  explicit CreateDriver(ros::NodeHandle& nh);
+  explicit CreateDriver(const std::string & name);
   ~CreateDriver();
-  virtual void spin();
-  virtual void spinOnce();
+
+  using CallbackReturn = 
+    rclcpp_lifecycle::node_interfaces::LifecycleNodeInterface::CallbackReturn;
+  
+  CallbackReturn = on_configure(const rclcpp_lifecycle::State &) override;
+  CallbackReturn = on_activate(const rclcpp_lifecycle::State &) override;
+  CallbackReturn = on_deactivate(const rclcpp_lifecycle::State &) override;
+  CallbackReturn = on_configure(const rclcpp_lifecycle::State &) override;
 };  // class CreateDriver
+
+}  // namespace create_autonomy
 
 #endif  // CREATE_DRIVER_CREATE_DRIVER_HPP_
