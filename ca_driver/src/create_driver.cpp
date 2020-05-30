@@ -184,6 +184,28 @@ CreateDriver::~CreateDriver()
 {
 }
 
+CallbackReturn CreateDriver::on_configure(const rclcpp_lifecycle::State &)
+{
+
+}
+
+CallbackReturn CreateDriver::on_activate(const rclcpp_lifecycle::State &)
+{
+
+}
+
+CallbackReturn CreateDriver::on_deactivate(const rclcpp_lifecycle::State &)
+{
+
+}
+
+CallbackReturn CreateDriver::on_cleanup(const rclcpp_lifecycle::State &)
+{
+
+}
+
+
+
 void CreateDriver::cmdVelCallback(const geometry_msgs::msg::Twist::SharedPtr msg)
 {
   robot_->drive(msg->linear.x, msg->angular.z);
