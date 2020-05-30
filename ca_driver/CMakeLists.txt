@@ -1,72 +1,74 @@
-cmake_minimum_required(VERSION 2.8.3)
+cmake_minimum_required(VERSION 3.5)
 project(ca_driver)
 
+if(NOT CMAKE_CXX_STANDARD)
+  set(CMAKE_CXX_STANDARD 14)
+endif()
+
+find_package(ament_cmake REQUIRED)
+find_package(ca_msgs REQUIRED)
+find_package(diagnostic_msgs REQUIRED)
+#find_package(diagnostic_updater REQUIRED)
+find_package(geometry_msgs REQUIRED)
 find_package(libcreate REQUIRED)
-
-find_package(catkin REQUIRED COMPONENTS
-  ca_msgs
-  diagnostic_msgs
-  diagnostic_updater
-  geometry_msgs
-  nav_msgs
-  roscpp
-  roslint
-  sensor_msgs
-  std_msgs
-  tf
-)
-
-catkin_package(
-  INCLUDE_DIRS include
-  CATKIN_DEPENDS
-    ca_msgs
-    diagnostic_msgs
-    diagnostic_updater
-    geometry_msgs
-    nav_msgs
-    roscpp
-    sensor_msgs
-    std_msgs
-    tf
-  DEPENDS libcreate
-)
-
-roslint_cpp()
-roslint_add_test()
+find_package(nav_msgs REQUIRED)
+find_package(rclcpp REQUIRED)
+find_package(rclcpp_lifecycle REQUIRED)
+find_package(sensor_msgs REQUIRED)
+find_package(std_msgs REQUIRED)
+find_package(tf2 REQUIRED)
+find_package(tf2_ros REQUIRED)
 
 include_directories(
   include
+  ${ca_msgs_INCLUDE_DIRS}
+  ${diagnostic_msgs_INCLUDE_DIRS}
+  # ${diagnostic_updater_INCLUDE_DIRS}
+  ${geometry_msgs_INCLUDE_DIRS}
   ${libcreate_INCLUDE_DIRS}
-  ${catkin_INCLUDE_DIRS}
+  ${nav_msgs_INCLUDE_DIRS}
+  ${roscpp_INCLUDE_DIRS}
+  ${sensor_msgs_INCLUDE_DIRS}
+  ${std_msgs_INCLUDE_DIRS}
+  ${tf2_INCLUDE_DIRS}
 )
 
 add_executable(${PROJECT_NAME} src/create_driver.cpp)
+ament_target_dependencies(${PROJECT_NAME}
+ "ca_msgs"
+ "diagnostic_msgs"
+ # diagnostic_updater"
+ "geometry_msgs"
+ "libcreate"
+ "nav_msgs"
+ "rclcpp"
+ "rclcpp_lifecycle"
+ "sensor_msgs"
+ "std_msgs"
+ "tf2"
+ "tf2_ros"
+ )
 
-target_link_libraries(${PROJECT_NAME}
-  ${libcreate_LIBRARIES}
-  ${catkin_LIBRARIES}
-)
+#Test 
+if(BUILD_TESTING)
+  find_package(ament_lint_auto REQUIRED)
+  ament_lint_auto_find_test_dependencies()
+endif()
 
-add_dependencies(${PROJECT_NAME} ${catkin_EXPORTED_TARGETS})
-
+#lib directory
 install(TARGETS ${PROJECT_NAME}
-  ARCHIVE DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
-  LIBRARY DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
-  RUNTIME DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
+  DESTINATION lib/${PROJECT_NAME}
 )
 
-install(DIRECTORY include
-  DESTINATION ${CATKIN_PACKAGE_INCLUDE_DESTINATION}
-  FILES_MATCHING PATTERN "*.h"
-  PATTERN ".svn" EXCLUDE
+#include directory
+install(DIRECTORY include/${PROJECT_NAME}
+  DESTINATION include/4{PROJECT_NAME}
+  FILES_MATCHING PATTERN "*.hpp"
 )
 
-install(DIRECTORY launch/
-  DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION}/launch
-  PATTERN ".svn" EXCLUDE
+#config directory
+install(DIRECTORY config
+  DESTINATION config
 )
 
-install(DIRECTORY config/
-  DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION}/config
-  PATTERN ".svn" EXCLUDE
-)
+ament_package()
