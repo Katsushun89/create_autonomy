@@ -1,30 +1,5 @@
-/**
-Software License Agreement (BSD)
-\file      create_driver.cpp
-\authors   Jacob Perron <jacobmperron@gmail.com>
-\copyright Copyright (c) 2015, Autonomy Lab (Simon Fraser University), All rights reserved.
-Redistribution and use in source and binary forms, with or without
-modification, are permitted provided that the following conditions are met:
- * Redistributions of source code must retain the above copyright notice,
-   this list of conditions and the following disclaimer.
- * Redistributions in binary form must reproduce the above copyright notice,
-   this list of conditions and the following disclaimer in the
-   documentation and/or other materials provided with the distribution.
- * Neither the name of Autonomy Lab nor the names of its contributors may
-   be used to endorse or promote products derived from this software without
-   specific prior written permission.
-THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
-AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
-IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
-ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE
-LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
-CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
-SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
-INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
-CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
-ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
-POSSIBILITY OF SUCH DAMAGE.
-*/
+// Copyright 2015 Jacob Perron (Autonomy Lab, Simon Fraser University)
+
 #include <tf2/LinearMath/Quaternion.h>
 #include <tf2/transform_datatypes.h>
 
@@ -33,6 +8,9 @@ POSSIBILITY OF SUCH DAMAGE.
 #include <string>
 
 #include "create_driver/create_driver.hpp"
+
+namespace create_autonomy
+{
 
 CreateDriver::CreateDriver(const std::string & name)
 : LifecycleNode(name),
@@ -49,25 +27,25 @@ CreateDriver::CreateDriver(const std::string & name)
 
   rclcpp::Parameter parameter;
 
-  if(get_parameter("dev", parameter)){
+  if (get_parameter("dev", parameter)) {
     dev_ = parameter.get_value<std::string>();
   }
-  if(get_parameter("robot_model", parameter)){
+  if (get_parameter("robot_model", parameter)) {
     robot_model_name = parameter.get_value<std::string>();
   }
-  if(get_parameter("base_frame", parameter)){
+  if (get_parameter("base_frame", parameter)) {
     base_frame_ = parameter.get_value<std::string>();
   }
-  if(get_parameter("odom_frame", parameter)){
+  if (get_parameter("odom_frame", parameter)) {
     odom_frame_ = parameter.get_value<std::string>();
   }
-  if(get_parameter("latch_cmd_duration", parameter)){
+  if (get_parameter("latch_cmd_duration", parameter)) {
     latch_duration_ = parameter.get_value<double>();
   }
-  if(get_parameter("loop_hz", parameter)){
+  if (get_parameter("loop_hz", parameter)) {
     loop_hz_ = parameter.get_value<double>();
   }
-  if(get_parameter("publish_tf", parameter)){
+  if (get_parameter("publish_tf", parameter)) {
     publish_tf_ = parameter.get_value<bool>();
   }
 
@@ -84,7 +62,8 @@ CreateDriver::CreateDriver(const std::string & name)
     return;
   }
 
-  RCLCPP_STREAM(get_logger(), "[CREATE] \"%s\" selected", robot_model_name.c_str());
+  RCLCPP_INFO(get_logger(), "[CREATE] \"%s\" selected",
+    robot_model_name.c_str());
 
   baud_ = model_.getBaud();
   if (get_parameter("baud", parameter)) {
@@ -97,7 +76,7 @@ CreateDriver::~CreateDriver()
 {
 }
 
-CallbackReturn CreateDriver::on_configure(const rclcpp_lifecycle::State &)
+CreateDriver::CallbackReturn CreateDriver::on_configure(const rclcpp_lifecycle::State &)
 {
   using namespace std::chrono_literals;
 
@@ -118,7 +97,7 @@ CallbackReturn CreateDriver::on_configure(const rclcpp_lifecycle::State &)
   joint_state_msg_.name[0] = "left_wheel_joint";
   joint_state_msg_.name[1] = "right_wheel_joint";
 
-  // Populate intial covariances
+  // Populate initial covariances
   for (int i = 0; i < 36; i++) {
     odom_msg_.pose.covariance[i] = COVARIANCE[i];
     odom_msg_.twist.covariance[i] = COVARIANCE[i];
@@ -126,27 +105,27 @@ CallbackReturn CreateDriver::on_configure(const rclcpp_lifecycle::State &)
 
   // Setup subscribers
   cmd_vel_sub_ = create_subscription<geometry_msgs::msg::Twist>(
-    "cmd_vel", std::bind(&CreateDriver::cmdVelCallback, this, std::placeholders::_1));
+    "cmd_vel", 10, std::bind(&CreateDriver::cmdVelCallback, this, std::placeholders::_1));
   debris_led_sub_ = create_subscription<std_msgs::msg::Bool>(
-    "debris_led", std::bind(&CreateDriver::debrisLEDCallback, this, std::placeholders::_1));
+    "debris_led", 10, std::bind(&CreateDriver::debrisLEDCallback, this, std::placeholders::_1));
   spot_led_sub_ = create_subscription<std_msgs::msg::Bool>(
-    "spot_led", std::bind(&CreateDriver::spotLEDCallback, this, std::placeholders::_1));
+    "spot_led", 10, std::bind(&CreateDriver::spotLEDCallback, this, std::placeholders::_1));
   dock_led_sub_ = create_subscription<std_msgs::msg::Bool>(
-    "dock_led", std::bind(&CreateDriver::dockLEDCallback, this, std::placeholders::_1));
+    "dock_led", 10, std::bind(&CreateDriver::dockLEDCallback, this, std::placeholders::_1));
   check_led_sub_ = create_subscription<std_msgs::msg::Bool>(
-    "check_led", std::bind(&CreateDriver::checkLEDCallback, this, std::placeholders::_1));
+    "check_led", 10, std::bind(&CreateDriver::checkLEDCallback, this, std::placeholders::_1));
   power_led_sub_ = create_subscription<std_msgs::msg::UInt8MultiArray>(
-    "power_led", std::bind(&CreateDriver::powerLEDCallback, this, std::placeholders::_1));
+    "power_led", 10, std::bind(&CreateDriver::powerLEDCallback, this, std::placeholders::_1));
   set_ascii_sub_ = create_subscription<std_msgs::msg::UInt8MultiArray>(
-    "set_ascii", std::bind(&CreateDriver::setASCIICallback, this, std::placeholders::_1));
+    "set_ascii", 10, std::bind(&CreateDriver::setASCIICallback, this, std::placeholders::_1));
   dock_sub_ = create_subscription<std_msgs::msg::Empty>(
-    "dock", std::bind(&CreateDriver::dockCallback, this, std::placeholders::_1));
+    "dock", 10, std::bind(&CreateDriver::dockCallback, this, std::placeholders::_1));
   undock_sub_ = create_subscription<std_msgs::msg::Empty>(
-    "undock", std::bind(&CreateDriver::undockCallback, this, std::placeholders::_1));
+    "undock", 10, std::bind(&CreateDriver::undockCallback, this, std::placeholders::_1));
   define_song_sub_ = create_subscription<ca_msgs::msg::DefineSong>(
-    "define_song", std::bind(&CreateDriver::defineSongCallback, this, std::placeholders::_1));
+    "define_song", 10, std::bind(&CreateDriver::defineSongCallback, this, std::placeholders::_1));
   play_song_sub_ = create_subscription<ca_msgs::msg::PlaySong>(
-    "play_song", std::bind(&CreateDriver::playSongCallback, this, std::placeholders::_1));
+    "play_song", 10, std::bind(&CreateDriver::playSongCallback, this, std::placeholders::_1));
 
   // Setup publishers
   odom_pub_  = create_publisher<nav_msgs::msg::Odometry>("odom", 30);
@@ -186,7 +165,7 @@ CallbackReturn CreateDriver::on_configure(const rclcpp_lifecycle::State &)
   return CallbackReturn::SUCCESS;
 }
 
-CallbackReturn CreateDriver::on_activate(const rclcpp_lifecycle::State &)
+CreateDriver::CallbackReturn CreateDriver::on_activate(const rclcpp_lifecycle::State &)
 {
   if (!robot_->connect(dev_, baud_)) {
     RCLCPP_FATAL(get_logger(), "[CREATE] Failed to establish serial connection with Create.");
@@ -224,10 +203,10 @@ CallbackReturn CreateDriver::on_activate(const rclcpp_lifecycle::State &)
 
   timer_->reset();
 
-  retrun CallbackReturn::SUCCESS;
+  return CallbackReturn::SUCCESS;
 }
 
-CallbackReturn CreateDriver::on_deactivate(const rclcpp_lifecycle::State &)
+CreateDriver::CallbackReturn CreateDriver::on_deactivate(const rclcpp_lifecycle::State &)
 {
   timer_->cancel();
 
@@ -253,33 +232,33 @@ CallbackReturn CreateDriver::on_deactivate(const rclcpp_lifecycle::State &)
 
   robot_->disconnect();
   RCLCPP_INFO(get_logger(), "[CREATE] Destruct sequence initiated.");
-  retrun CallbackReturn::SUCCESS;
+  return CallbackReturn::SUCCESS;
 
 }
 
-CallbackReturn CreateDriver::on_cleanup(const rclcpp_lifecycle::State &)
+CreateDriver::CallbackReturn CreateDriver::on_cleanup(const rclcpp_lifecycle::State &)
 {
   timer_->reset();
 
-  odom_pub_->reset();
-  clean_btn_pub_->reset();
-  day_btn_pub_->reset();
-  hour_btn_pub_->reset();
-  min_btn_pub_->reset();
-  dock_btn_pub_->reset();
-  spot_btn_pub_->reset();
-  voltage_pub_->reset();
-  current_pub_->reset();
-  charge_pub_->reset();
-  charge_ratio_pub_->reset();
-  capacity_pub_->reset();
-  temperature_pub_->reset();
-  charging_state_pub_->reset();
-  omni_char_pub_->reset();
-  mode_pub_->reset();
-  bumper_pub_->reset();
-  wheeldrop_pub_->reset();
-  wheel_joint_pub_->reset();
+  odom_pub_.reset();
+  clean_btn_pub_.reset();
+  day_btn_pub_.reset();
+  hour_btn_pub_.reset();
+  min_btn_pub_.reset();
+  dock_btn_pub_.reset();
+  spot_btn_pub_.reset();
+  voltage_pub_.reset();
+  current_pub_.reset();
+  charge_pub_.reset();
+  charge_ratio_pub_.reset();
+  capacity_pub_.reset();
+  temperature_pub_.reset();
+  charging_state_pub_.reset();
+  omni_char_pub_.reset();
+  mode_pub_.reset();
+  bumper_pub_.reset();
+  wheeldrop_pub_.reset();
+  wheel_joint_pub_.reset();
 
   cmd_vel_sub_.reset();
   debris_led_sub_.reset();
@@ -295,14 +274,14 @@ CallbackReturn CreateDriver::on_cleanup(const rclcpp_lifecycle::State &)
 
   robot_.reset();
 
-  retrun CallbackReturn::SUCCESS;
+  return CallbackReturn::SUCCESS;
 
 }
 
 void CreateDriver::cmdVelCallback(const geometry_msgs::msg::Twist::SharedPtr msg)
 {
   robot_->drive(msg->linear.x, msg->angular.z);
-  last_cmd_vel_time_ = ros_clock_::now();
+  last_cmd_vel_time_ = ros_clock_.now();
 }
 
 void CreateDriver::debrisLEDCallback(const std_msgs::msg::Bool::SharedPtr msg)
@@ -362,9 +341,9 @@ void CreateDriver::dockCallback(const std_msgs::msg::Empty::SharedPtr msg)
 {
   robot_->setMode(create::MODE_PASSIVE);
 
-  if (model_.getVersion() <= create::V_2)
+  if (model_.getVersion() <= create::V_2) {
     usleep(1000000);  // Create 1 requires a delay (1 sec)
-
+  }
   // Call docking behaviour
   robot_->dock();
 }
@@ -379,19 +358,20 @@ void CreateDriver::defineSongCallback(const ca_msgs::msg::DefineSong::SharedPtr 
 {
   if (!robot_->defineSong(msg->song, msg->length, &(msg->notes.front()), &(msg->durations.front())))
   {
-    RCLCPP_ERROR(get_logger(), "[CREATE] Failed to define song " << msg->song << " of length " << msg->length);
+    RCLCPP_ERROR(get_logger(), "[CREATE] Failed to define song %d of length %d",
+      msg->song, msg->length);
   }
 }
 
-void CreateDriver::playSongCallback(const ca_msgs::PlaySong::SharedPtr msg)
+void CreateDriver::playSongCallback(const ca_msgs::msg::PlaySong::SharedPtr msg)
 {
   if (!robot_->playSong(msg->song))
   {
-    RCLCPP_ERROR(get_logger(), "[CREATE] Failed to play song " << msg->song);
+    RCLCPP_ERROR(get_logger(), "[CREATE] Failed to play song %d",  msg->song);
   }
 }
 
-bool CreateDriver::update()
+void CreateDriver::update()
 {
   publishOdom();
   publishJointState();
@@ -407,7 +387,6 @@ bool CreateDriver::update()
     robot_->drive(0, 0);
   }
 
-  return true;
 }
 
 #if 0 //unsupport diagnostic_updater until now
@@ -603,7 +582,7 @@ void CreateDriver::publishOdom()
 void CreateDriver::publishJointState()
 {
   // Publish joint states
-  doubl wheelRadius = model_.getWheelDiameter() / 2.0;
+  double wheelRadius = model_.getWheelDiameter() / 2.0;
 
   joint_state_msg_.header.stamp = ros_clock_.now();
   joint_state_msg_.position[0] = robot_->getLeftWheelDistance() / wheelRadius;
@@ -632,7 +611,7 @@ void CreateDriver::publishBatteryInfo()
   charging_state_msg_.header.stamp = ros_clock_.now();
   switch (charging_state) {
     case create::CHARGE_NONE:
-      charging_state_msg_.state = ca_msgs::msg::ChargingState.CHARGE_NONE;
+      charging_state_msg_.state = ca_msgs::msg::ChargingState::CHARGE_NONE;
       break;
     case create::CHARGE_RECONDITION:
       charging_state_msg_.state = ca_msgs::msg::ChargingState::CHARGE_RECONDITION;
@@ -741,6 +720,8 @@ void CreateDriver::publishWheeldrop()
   if (robot_->isWheeldrop())
     wheeldrop_pub_->publish(empty_msg_);
 }
+
+}  // namespace create_autonomy
 
 int main(int argc, char** argv)
 {
