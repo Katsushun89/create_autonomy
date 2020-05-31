@@ -238,7 +238,7 @@ CreateDriver::CallbackReturn CreateDriver::on_deactivate(const rclcpp_lifecycle:
 
 CreateDriver::CallbackReturn CreateDriver::on_cleanup(const rclcpp_lifecycle::State &)
 {
-  timer_->reset();
+  timer_.reset();
 
   odom_pub_.reset();
   clean_btn_pub_.reset();
