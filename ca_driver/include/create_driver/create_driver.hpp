@@ -94,6 +94,7 @@ private:
   void updateDriverDiagnostics(diagnostic_updater::DiagnosticStatusWrapper& stat);
 #endif
 
+  void initializeParameters();
   void update();
   void publishOdom();
   void publishJointState();

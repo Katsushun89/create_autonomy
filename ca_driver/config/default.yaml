@@ -20,3 +20,5 @@ ca_driver:
 
         # Whether to publish the transform between odom_frame and base_frame
         publish_tf: true
+
+        robot_model : "CREATE_2"

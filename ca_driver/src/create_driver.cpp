@@ -15,18 +15,41 @@ namespace create_autonomy
 CreateDriver::CreateDriver(const std::string & name)
 : LifecycleNode(name),
   model_(create::RobotModel::CREATE_2),
-  ros_clock_(RCL_ROS_TIME),
-  dev_("/dev/ttyUSB0"),
-  base_frame_("base_footprint"),
-  odom_frame_("odom"),
-  latch_duration_(0.2),
-  loop_hz_(10.0),
-  publish_tf_(true)
+  ros_clock_(RCL_ROS_TIME)
+//  dev_("/dev/ttyUSB0"),
+//  base_frame_("base_footprint"),
+//  odom_frame_("odom"),
+//  latch_duration_(0.2),
+//  loop_hz_(10.0),
+//  publish_tf_(true)
 {
-  std::string robot_model_name = "CREATE_2";
+
+  declare_parameter("dev", "/dev/ttyUSB0");
+  declare_parameter("base_frame", "base_fottprint");
+  declare_parameter("odom_frame", "odom");
+  declare_parameter("latch_cmd_duration", 0.2);
+  declare_parameter("loop_hz", 10.0);
+  declare_parameter("publish_tf", true);
+  declare_parameter("robot_model", "CREATE_1");
+
+}
+
+
+CreateDriver::~CreateDriver()
+{
+}
+
+void CreateDriver::initializeParameters()
+{
+
+}
+
+CreateDriver::CallbackReturn CreateDriver::on_configure(const rclcpp_lifecycle::State &)
+{
+  RCLCPP_INFO(get_logger(), "on_configure");
 
   rclcpp::Parameter parameter;
-
+  std::string robot_model_name = "CREATE_2";
   if (get_parameter("dev", parameter)) {
     dev_ = parameter.get_value<std::string>();
   }
@@ -59,7 +82,7 @@ CreateDriver::CreateDriver(const std::string & name)
     RCLCPP_FATAL(get_logger(), "[CREATE] Robot model \"%s\" is not known.",
       robot_model_name.c_str());
     rclcpp::shutdown();
-    return;
+    return CallbackReturn::FAILURE;
   }
 
   RCLCPP_INFO(get_logger(), "[CREATE] \"%s\" selected",
@@ -69,17 +92,16 @@ CreateDriver::CreateDriver(const std::string & name)
   if (get_parameter("baud", parameter)) {
     baud_ = parameter.get_value<int>();
   }
-}
+  RCLCPP_INFO(get_logger(), "dev \"%s\"", dev_.c_str());
+  RCLCPP_INFO(get_logger(), "base_frame \"%s\"", base_frame_.c_str());
+  RCLCPP_INFO(get_logger(), "odom_frame \"%s\"", odom_frame_.c_str());
+  RCLCPP_INFO(get_logger(), "latch_duration \"%f\"", latch_duration_);
+  RCLCPP_INFO(get_logger(), "loop_hz \"%f\"", loop_hz_);
+  RCLCPP_INFO(get_logger(), "publish_tf \"%s\"", (publish_tf_ ? "True" : "False"));
 
-
-CreateDriver::~CreateDriver()
-{
-}
-
-CreateDriver::CallbackReturn CreateDriver::on_configure(const rclcpp_lifecycle::State &)
-{
+ 
   using namespace std::chrono_literals;
-
+  initializeParameters();
   robot_ = std::make_unique<create::Create>(model_);
 
   // Set frame_id's
@@ -167,6 +189,8 @@ CreateDriver::CallbackReturn CreateDriver::on_configure(const rclcpp_lifecycle::
 
 CreateDriver::CallbackReturn CreateDriver::on_activate(const rclcpp_lifecycle::State &)
 {
+  RCLCPP_INFO(get_logger(), "on_activate");
+
   if (!robot_->connect(dev_, baud_)) {
     RCLCPP_FATAL(get_logger(), "[CREATE] Failed to establish serial connection with Create.");
     rclcpp::shutdown();
