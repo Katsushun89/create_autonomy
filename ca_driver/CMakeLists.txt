@@ -67,8 +67,14 @@ install(DIRECTORY include/${PROJECT_NAME}
 )
 
 #config directory
-install(DIRECTORY config
-  DESTINATION config
+install(DIRECTORY
+  config
+  DESTINATION share/${PROJECT_NAME}/
+)
+
+install(DIRECTORY
+  launch
+  DESTINATION share/${PROJECT_NAME}/
 )
 
 ament_package()
