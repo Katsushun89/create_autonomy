@@ -29,6 +29,12 @@ def generate_launch_description():
         parameters=[config_param_dir],
         output='screen')
 
+    to_inactive = launch.actions.EmitEvent(
+        event=launch_ros.events.lifecycle.ChangeState(
+            lifecycle_node_matcher=launch.events.matches_action(ca_driver),
+            transition_id=lifecycle_msgs.msg.Transition.TRANSITION_CONFIGURE,
+        )
+    )
 
     to_inactive = launch.actions.EmitEvent(
         event=launch_ros.events.lifecycle.ChangeState(
@@ -68,6 +74,8 @@ def generate_launch_description():
 
     ld.add_action(from_unconfigured_to_inactive)
     ld.add_action(from_inactive_to_active)
+    
     ld.add_action(ca_driver)
+    ld.add_action(to_inactive)
     return ld
 

@@ -30,7 +30,7 @@ CreateDriver::CreateDriver(const std::string & name)
   declare_parameter("latch_cmd_duration", 0.2);
   declare_parameter("loop_hz", 10.0);
   declare_parameter("publish_tf", true);
-  declare_parameter("robot_model", "CREATE_1");
+  declare_parameter("robot_model", "CREATE_2");
 
 }
 
@@ -98,6 +98,7 @@ CreateDriver::CallbackReturn CreateDriver::on_configure(const rclcpp_lifecycle::
   RCLCPP_INFO(get_logger(), "latch_duration \"%f\"", latch_duration_);
   RCLCPP_INFO(get_logger(), "loop_hz \"%f\"", loop_hz_);
   RCLCPP_INFO(get_logger(), "publish_tf \"%s\"", (publish_tf_ ? "True" : "False"));
+  RCLCPP_INFO(get_logger(), "baud \"%d\"", baud_);
 
  
   using namespace std::chrono_literals;
