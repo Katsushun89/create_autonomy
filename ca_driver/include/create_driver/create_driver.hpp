@@ -148,6 +148,7 @@ public:
   CallbackReturn on_activate(const rclcpp_lifecycle::State &) override;
   CallbackReturn on_deactivate(const rclcpp_lifecycle::State &) override;
   CallbackReturn on_cleanup(const rclcpp_lifecycle::State &) override;
+  CallbackReturn on_error(const rclcpp_lifecycle::State &) override;
 };  // class CreateDriver
 
 }  // namespace create_autonomy

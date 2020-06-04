@@ -104,6 +104,7 @@ CreateDriver::CallbackReturn CreateDriver::on_configure(const rclcpp_lifecycle::
   using namespace std::chrono_literals;
   initializeParameters();
   robot_ = std::make_unique<create::Create>(model_);
+  tf_broadcaster_ = std::make_shared<tf2_ros::TransformBroadcaster>(shared_from_this());
 
   // Set frame_id's
   mode_msg_.header.frame_id = base_frame_;
@@ -227,12 +228,12 @@ CreateDriver::CallbackReturn CreateDriver::on_activate(const rclcpp_lifecycle::S
   wheel_joint_pub_->on_activate();
 
   timer_->reset();
-
   return CallbackReturn::SUCCESS;
 }
 
 CreateDriver::CallbackReturn CreateDriver::on_deactivate(const rclcpp_lifecycle::State &)
 {
+  RCLCPP_INFO(get_logger(), "on_deactivate");
   timer_->cancel();
 
   odom_pub_->on_deactivate();
@@ -263,6 +264,7 @@ CreateDriver::CallbackReturn CreateDriver::on_deactivate(const rclcpp_lifecycle:
 
 CreateDriver::CallbackReturn CreateDriver::on_cleanup(const rclcpp_lifecycle::State &)
 {
+  RCLCPP_INFO(get_logger(), "on_cleanup");
   timer_.reset();
 
   odom_pub_.reset();
@@ -303,6 +305,48 @@ CreateDriver::CallbackReturn CreateDriver::on_cleanup(const rclcpp_lifecycle::St
 
 }
 
+CreateDriver::CallbackReturn CreateDriver::on_error(const rclcpp_lifecycle::State &)
+{
+  RCLCPP_INFO(get_logger(), "on_error");
+  timer_.reset();
+
+  odom_pub_.reset();
+  clean_btn_pub_.reset();
+  day_btn_pub_.reset();
+  hour_btn_pub_.reset();
+  min_btn_pub_.reset();
+  dock_btn_pub_.reset();
+  spot_btn_pub_.reset();
+  voltage_pub_.reset();
+  current_pub_.reset();
+  charge_pub_.reset();
+  charge_ratio_pub_.reset();
+  capacity_pub_.reset();
+  temperature_pub_.reset();
+  charging_state_pub_.reset();
+  omni_char_pub_.reset();
+  mode_pub_.reset();
+  bumper_pub_.reset();
+  wheeldrop_pub_.reset();
+  wheel_joint_pub_.reset();
+
+  cmd_vel_sub_.reset();
+  debris_led_sub_.reset();
+  spot_led_sub_.reset();
+  dock_led_sub_.reset();
+  check_led_sub_.reset();
+  power_led_sub_.reset();
+  set_ascii_sub_.reset();
+  dock_sub_.reset();
+  undock_sub_.reset();
+  define_song_sub_.reset();
+  play_song_sub_.reset();
+
+  robot_.reset();
+
+  return CallbackReturn::SUCCESS;
+}
+ 
 void CreateDriver::cmdVelCallback(const geometry_msgs::msg::Twist::SharedPtr msg)
 {
   robot_->drive(msg->linear.x, msg->angular.z);
@@ -407,11 +451,12 @@ void CreateDriver::update()
   publishBumperInfo();
   publishWheeldrop();
 
+#if 0 
   // If last velocity command was sent longer than latch duration, stop robot
   if (ros_clock_.now() - last_cmd_vel_time_ >= rclcpp::Duration(latch_duration_)) {
     robot_->drive(0, 0);
   }
-
+#endif
 }
 
 #if 0 //unsupport diagnostic_updater until now
@@ -598,9 +643,9 @@ void CreateDriver::publishOdom()
     tf_odom_.transform.rotation.y = quat.y();
     tf_odom_.transform.rotation.z = quat.z();
     tf_odom_.transform.rotation.w = quat.w();
+
     tf_broadcaster_->sendTransform(tf_odom_);
   }
-
   odom_pub_->publish(odom_msg_);
 }
 
