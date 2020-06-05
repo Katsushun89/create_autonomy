@@ -16,14 +16,7 @@ CreateDriver::CreateDriver(const std::string & name)
 : LifecycleNode(name),
   model_(create::RobotModel::CREATE_2),
   ros_clock_(RCL_ROS_TIME)
-//  dev_("/dev/ttyUSB0"),
-//  base_frame_("base_footprint"),
-//  odom_frame_("odom"),
-//  latch_duration_(0.2),
-//  loop_hz_(10.0),
-//  publish_tf_(true)
 {
-
   declare_parameter("dev", "/dev/ttyUSB0");
   declare_parameter("base_frame", "base_fottprint");
   declare_parameter("odom_frame", "odom");
@@ -31,23 +24,14 @@ CreateDriver::CreateDriver(const std::string & name)
   declare_parameter("loop_hz", 10.0);
   declare_parameter("publish_tf", true);
   declare_parameter("robot_model", "CREATE_2");
-
 }
-
 
 CreateDriver::~CreateDriver()
 {
 }
 
-void CreateDriver::initializeParameters()
+bool CreateDriver::initializeParameters()
 {
-
-}
-
-CreateDriver::CallbackReturn CreateDriver::on_configure(const rclcpp_lifecycle::State &)
-{
-  RCLCPP_INFO(get_logger(), "on_configure");
-
   rclcpp::Parameter parameter;
   std::string robot_model_name = "CREATE_2";
   if (get_parameter("dev", parameter)) {
@@ -82,7 +66,7 @@ CreateDriver::CallbackReturn CreateDriver::on_configure(const rclcpp_lifecycle::
     RCLCPP_FATAL(get_logger(), "[CREATE] Robot model \"%s\" is not known.",
       robot_model_name.c_str());
     rclcpp::shutdown();
-    return CallbackReturn::FAILURE;
+    return false;
   }
 
   RCLCPP_INFO(get_logger(), "[CREATE] \"%s\" selected",
@@ -100,9 +84,6 @@ CreateDriver::CallbackReturn CreateDriver::on_configure(const rclcpp_lifecycle::
   RCLCPP_INFO(get_logger(), "publish_tf \"%s\"", (publish_tf_ ? "True" : "False"));
   RCLCPP_INFO(get_logger(), "baud \"%d\"", baud_);
 
- 
-  using namespace std::chrono_literals;
-  initializeParameters();
   robot_ = std::make_unique<create::Create>(model_);
   tf_broadcaster_ = std::make_shared<tf2_ros::TransformBroadcaster>(shared_from_this());
 
@@ -126,7 +107,35 @@ CreateDriver::CallbackReturn CreateDriver::on_configure(const rclcpp_lifecycle::
     odom_msg_.pose.covariance[i] = COVARIANCE[i];
     odom_msg_.twist.covariance[i] = COVARIANCE[i];
   }
+  return true;
+}
 
+void CreateDriver::setupPublishers()
+{
+  // Setup publishers
+  odom_pub_  = create_publisher<nav_msgs::msg::Odometry>("odom", 30);
+  clean_btn_pub_  = create_publisher<std_msgs::msg::Empty>("clean_button", 30);
+  day_btn_pub_  = create_publisher<std_msgs::msg::Empty>("day_button", 30);
+  hour_btn_pub_  = create_publisher<std_msgs::msg::Empty>("hour_button", 30);
+  min_btn_pub_  = create_publisher<std_msgs::msg::Empty>("minute_button", 30);
+  dock_btn_pub_  = create_publisher<std_msgs::msg::Empty>("dock_button", 30);
+  spot_btn_pub_  = create_publisher<std_msgs::msg::Empty>("spot_button", 30);
+  voltage_pub_  = create_publisher<std_msgs::msg::Float32>("battery/voltage", 30);
+  current_pub_  = create_publisher<std_msgs::msg::Float32>("battery/current", 30);
+  charge_pub_  = create_publisher<std_msgs::msg::Float32>("battery/charge", 30);
+  charge_ratio_pub_  = create_publisher<std_msgs::msg::Float32>("battery/charge_ratio", 30);
+  capacity_pub_  = create_publisher<std_msgs::msg::Float32>("battery/capacity", 30);
+  temperature_pub_  = create_publisher<std_msgs::msg::Int16>("battery/temperature", 30);
+  charging_state_pub_  = create_publisher<ca_msgs::msg::ChargingState>("battery/charging_state", 30);
+  omni_char_pub_  = create_publisher<std_msgs::msg::UInt16>("ir_omni", 30);
+  mode_pub_  = create_publisher<ca_msgs::msg::Mode>("mode", 30);
+  bumper_pub_  = create_publisher<ca_msgs::msg::Bumper>("bumper", 30);
+  wheeldrop_pub_  = create_publisher<std_msgs::msg::Empty>("wheeldrop", 30);
+  wheel_joint_pub_  = create_publisher<sensor_msgs::msg::JointState>("joint_states", 10);
+}
+
+void CreateDriver::setupSubscribers()
+{
   // Setup subscribers
   cmd_vel_sub_ = create_subscription<geometry_msgs::msg::Twist>(
     "cmd_vel", 10, std::bind(&CreateDriver::cmdVelCallback, this, std::placeholders::_1));
@@ -150,31 +159,17 @@ CreateDriver::CallbackReturn CreateDriver::on_configure(const rclcpp_lifecycle::
     "define_song", 10, std::bind(&CreateDriver::defineSongCallback, this, std::placeholders::_1));
   play_song_sub_ = create_subscription<ca_msgs::msg::PlaySong>(
     "play_song", 10, std::bind(&CreateDriver::playSongCallback, this, std::placeholders::_1));
+}
 
-  // Setup publishers
-  odom_pub_  = create_publisher<nav_msgs::msg::Odometry>("odom", 30);
-  clean_btn_pub_  = create_publisher<std_msgs::msg::Empty>("clean_button", 30);
-  day_btn_pub_  = create_publisher<std_msgs::msg::Empty>("day_button", 30);
-  hour_btn_pub_  = create_publisher<std_msgs::msg::Empty>("hour_button", 30);
-  min_btn_pub_  = create_publisher<std_msgs::msg::Empty>("minute_button", 30);
-  dock_btn_pub_  = create_publisher<std_msgs::msg::Empty>("dock_button", 30);
-  spot_btn_pub_  = create_publisher<std_msgs::msg::Empty>("spot_button", 30);
-  voltage_pub_  = create_publisher<std_msgs::msg::Float32>("battery/voltage", 30);
-  current_pub_  = create_publisher<std_msgs::msg::Float32>("battery/current", 30);
-  charge_pub_  = create_publisher<std_msgs::msg::Float32>("battery/charge", 30);
-  charge_ratio_pub_  = create_publisher<std_msgs::msg::Float32>("battery/charge_ratio", 30);
-  capacity_pub_  = create_publisher<std_msgs::msg::Float32>("battery/capacity", 30);
-  temperature_pub_  = create_publisher<std_msgs::msg::Int16>("battery/temperature", 30);
-  charging_state_pub_  = create_publisher<ca_msgs::msg::ChargingState>("battery/charging_state", 30);
-  omni_char_pub_  = create_publisher<std_msgs::msg::UInt16>("ir_omni", 30);
-  mode_pub_  = create_publisher<ca_msgs::msg::Mode>("mode", 30);
-  bumper_pub_  = create_publisher<ca_msgs::msg::Bumper>("bumper", 30);
-  wheeldrop_pub_  = create_publisher<std_msgs::msg::Empty>("wheeldrop", 30);
-  wheel_joint_pub_  = create_publisher<sensor_msgs::msg::JointState>("joint_states", 10);
-
+void CreateDriver::setupTimer()
+{
+  using namespace std::chrono_literals;
   timer_ = create_wall_timer(100ms, std::bind(&CreateDriver::update, this));
   timer_->cancel();
+}
 
+void CreateDriver::setupDiagnostics()
+{
   // Setup diagnostics
   //diagnostics_.add("Battery Status", this, &CreateDriver::updateBatteryDiagnostics);
   //diagnostics_.add("Safety Status", this, &CreateDriver::updateSafetyDiagnostics);
@@ -183,9 +178,19 @@ CreateDriver::CallbackReturn CreateDriver::on_configure(const rclcpp_lifecycle::
   //diagnostics_.add("Driver Status", this, &CreateDriver::updateDriverDiagnostics);
 
   //diagnostics_.setHardwareID(robot_model_name);
+}
+
+CreateDriver::CallbackReturn CreateDriver::on_configure(const rclcpp_lifecycle::State &)
+{
+  RCLCPP_INFO(get_logger(), "on_configure");
+
+  if(!initializeParameters()) return CallbackReturn::FAILURE;
+  setupSubscribers();
+  setupPublishers();
+  setupTimer();
+  setupDiagnostics();
 
   RCLCPP_INFO(get_logger(), "[CREATE] Ready.");
-
   return CallbackReturn::SUCCESS;
 }
 
@@ -262,9 +267,8 @@ CreateDriver::CallbackReturn CreateDriver::on_deactivate(const rclcpp_lifecycle:
 
 }
 
-CreateDriver::CallbackReturn CreateDriver::on_cleanup(const rclcpp_lifecycle::State &)
+void CreateDriver::resetResources()
 {
-  RCLCPP_INFO(get_logger(), "on_cleanup");
   timer_.reset();
 
   odom_pub_.reset();
@@ -299,51 +303,21 @@ CreateDriver::CallbackReturn CreateDriver::on_cleanup(const rclcpp_lifecycle::St
   define_song_sub_.reset();
   play_song_sub_.reset();
 
+  tf_broadcaster_.reset();
   robot_.reset();
+}
 
+CreateDriver::CallbackReturn CreateDriver::on_cleanup(const rclcpp_lifecycle::State &)
+{
+  RCLCPP_INFO(get_logger(), "on_cleanup");
+  resetResources();
   return CallbackReturn::SUCCESS;
-
 }
 
 CreateDriver::CallbackReturn CreateDriver::on_error(const rclcpp_lifecycle::State &)
 {
   RCLCPP_INFO(get_logger(), "on_error");
-  timer_.reset();
-
-  odom_pub_.reset();
-  clean_btn_pub_.reset();
-  day_btn_pub_.reset();
-  hour_btn_pub_.reset();
-  min_btn_pub_.reset();
-  dock_btn_pub_.reset();
-  spot_btn_pub_.reset();
-  voltage_pub_.reset();
-  current_pub_.reset();
-  charge_pub_.reset();
-  charge_ratio_pub_.reset();
-  capacity_pub_.reset();
-  temperature_pub_.reset();
-  charging_state_pub_.reset();
-  omni_char_pub_.reset();
-  mode_pub_.reset();
-  bumper_pub_.reset();
-  wheeldrop_pub_.reset();
-  wheel_joint_pub_.reset();
-
-  cmd_vel_sub_.reset();
-  debris_led_sub_.reset();
-  spot_led_sub_.reset();
-  dock_led_sub_.reset();
-  check_led_sub_.reset();
-  power_led_sub_.reset();
-  set_ascii_sub_.reset();
-  dock_sub_.reset();
-  undock_sub_.reset();
-  define_song_sub_.reset();
-  play_song_sub_.reset();
-
-  robot_.reset();
-
+  resetResources();
   return CallbackReturn::SUCCESS;
 }
  

@@ -94,8 +94,14 @@ private:
   void updateDriverDiagnostics(diagnostic_updater::DiagnosticStatusWrapper& stat);
 #endif
 
-  void initializeParameters();
+  bool initializeParameters();
+  void setupPublishers();
+  void setupSubscribers();
+  void setupTimer();
+  void setupDiagnostics();
+
   void update();
+  void resetResources();
   void publishOdom();
   void publishJointState();
   void publishBatteryInfo();
